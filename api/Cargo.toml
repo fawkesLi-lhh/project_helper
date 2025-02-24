@@ -1,0 +1,17 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+graphviz-rust = "0.9.3"
+anyhow = "1.0"
+auto-context = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+scraper = "0.22"
+ego-tree = "0.10"
+tokio = { version = "1.42.0", features = ["full"] }
+axum = "0.7"
+lazy_static = "1.4"
+tower-http = { version = "0.5", features = ["cors"] }
