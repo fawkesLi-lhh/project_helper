@@ -10,7 +10,7 @@ use axum::{
     Json, Router,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Mutex,
 };
 
@@ -27,6 +27,9 @@ pub fn routes() -> Router {
         .route("/init_graph", get(init_graph))
         .route("/node", get(search_node))
         .route("/node", put(put_node))
+        .route("/node_tree", put(put_node_tree))
+        .route("/filter_node_father_tree", put(filter_node_father_tree))
+        // .route("/clean_signal", get(clean_signal))
         .route("/node", delete(delete_node))
         .route("/node", post(post_node))
         .route("/graph", get(gen_graph))
@@ -95,11 +98,14 @@ pub async fn post_node(Json(query): Json<Node>) -> Json<ResponseStatus> {
 
 #[auto_context::auto_context]
 fn delete_node_inner(id: String) -> Result<()> {
-    let mut pre_state = STATE.lock().unwrap();
-    let state = pre_state
-        .as_mut()
-        .ok_or(anyhow::anyhow!("state not found"))?;
-    state.node_set.remove(&id);
+    {
+        let mut pre_state = STATE.lock().unwrap();
+        let state = pre_state
+            .as_mut()
+            .ok_or(anyhow::anyhow!("state not found"))?;
+        state.node_set.remove(&id);
+    }
+    clean_signal_inner()?;
     Ok(())
 }
 
@@ -115,6 +121,100 @@ fn put_node_inner(query: Node) -> Result<()> {
         .as_mut()
         .ok_or(anyhow::anyhow!("state not found"))?;
     state.node_set.insert(query.id.clone());
+    Ok(())
+}
+
+pub async fn put_node_tree(Query(query): Query<Node>) -> Json<ResponseStatus> {
+    process_resp(put_node_tree_inner(query))
+}
+
+pub async fn clean_signal() -> Json<ResponseStatus> {
+    process_resp(clean_signal_inner())
+}
+
+#[auto_context::auto_context]
+fn clean_signal_inner() -> Result<()> {
+    let mut pre_state = STATE.lock().unwrap();
+    let state = pre_state
+        .as_mut()
+        .ok_or(anyhow::anyhow!("state not found"))?;
+    let mut now_node_set = HashSet::new();
+    for (from, to) in &state.edge_from_to {
+        if !state.node_set.contains(from) {
+            continue;
+        }
+        for tto in to {
+            if !state.node_set.contains(tto) {
+                continue;
+            }
+            now_node_set.insert(from.clone());
+            now_node_set.insert(tto.clone());
+        }
+    }
+    state.node_set = now_node_set;
+
+    Ok(())
+}
+
+pub async fn filter_node_father_tree(Query(query): Query<Node>) -> Json<ResponseStatus> {
+    process_resp(filter_node_father_tree_inner(query))
+}
+
+#[auto_context::auto_context]
+fn filter_node_father_tree_inner(query: Node) -> Result<()> {
+    let mut pre_state = STATE.lock().unwrap();
+    let state = pre_state
+        .as_mut()
+        .ok_or(anyhow::anyhow!("state not found"))?;
+    let mut edge_to_from = HashMap::new();
+    for i in state.edge_from_to.iter() {
+        for j in i.1.iter() {
+            let entry = edge_to_from.entry(j.clone()).or_insert_with(HashSet::new);
+            entry.insert(i.0.clone());
+        }
+    }
+    let mut new_node_set = HashSet::new();
+    let mut now_deque = VecDeque::new();
+    now_deque.push_back(query.id.clone());
+    while let Some(now_id) = now_deque.pop_front() {
+        if new_node_set.contains(&now_id) {
+            continue;
+        }
+        new_node_set.insert(now_id.clone());
+        if let Some(fathers) = edge_to_from.get(&now_id) {
+            for father in fathers {
+                if state.node_set.contains(father) {
+                    now_deque.push_back(father.clone());
+                }
+            }
+        }
+    }
+    state.node_set = new_node_set;
+
+    Ok(())
+}
+
+#[auto_context::auto_context]
+fn put_node_tree_inner(query: Node) -> Result<()> {
+    println!("put tree node {:?}", query);
+    let mut pre_state = STATE.lock().unwrap();
+    let state = pre_state
+        .as_mut()
+        .ok_or(anyhow::anyhow!("state not found"))?;
+    let mut now_deque = VecDeque::new();
+    state.node_set.remove(&query.id);
+    now_deque.push_back(query.id);
+    while let Some(now_id) = now_deque.pop_front() {
+        if state.node_set.contains(&now_id) {
+            continue;
+        }
+        state.node_set.insert(now_id.clone());
+        if let Some(tos) = state.edge_from_to.get(&now_id) {
+            for to in tos {
+                now_deque.push_back(to.clone());
+            }
+        }
+    }
     Ok(())
 }
 

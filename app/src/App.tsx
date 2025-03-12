@@ -21,7 +21,7 @@ interface NodeData {
 
 function App() {
   const [graphDefinition, setGraphDefinition] = useState(`flowchart TD`);
-  const [nowSelectedNode, setNowSelectedNode] = useState<string | null>(null);
+  const [nowSelectedNode, setNowSelectedNode] = useState<string | null>(null);// 图上目前选择的
   const [reactflowNodes, setReactflowNodes] = useState<Node[]>([]);
   const [reactflowEdges, setReactflowEdges] = useState<Edge[]>([]);
   const [mermaidChartDirection, setMermaidChartDirection] =
@@ -30,8 +30,7 @@ function App() {
     useState<editor.IStandaloneCodeEditor>();
   const [relatedNodes, setRelatedNodes] = useState<NodeData[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);//列表目前选择的
   useEffect(() => {
     const fetchRelatedNodes = async () => {
       try {
@@ -46,6 +45,7 @@ function App() {
         console.log('relatedNodes', data);
         const ndata: NodeData[] = data.data;
         setRelatedNodes(ndata);
+        setSelectedNodeId(ndata[0]?.id);
         //setRelatedNodes(data);
       } catch (error) {
         console.error("Error fetching related nodes:", error);
@@ -184,8 +184,47 @@ function App() {
     }
   };
 
+  //nowSelectedNode
+  const handlePutNodeTree = async () => {
+    if (nowSelectedNode) {
+      try {
+        const response = await fetch(`http://localhost:4096/node_tree?id=${nowSelectedNode}`, {
+          method: "PUT",
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        console.log(`Node with id ${nowSelectedNode} deleted successfully.`);
+        await refreshGraph();
+      } catch (error) {
+        console.error("Error deleting node:", error);
+      }
+    } else {
+      console.log("No node selected to delete.");
+    }
+  }
+
+  const handleCleanNodeFather = async () => {
+    if (nowSelectedNode) {
+      try {
+        const response = await fetch(`http://localhost:4096/filter_node_father_tree?id=${nowSelectedNode}`, {
+          method: "PUT",
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        console.log(`Node with id ${nowSelectedNode} deleted successfully.`);
+        await refreshGraph();
+      } catch (error) {
+        console.error("Error deleting node:", error);
+      }
+    } else {
+      console.log("No node selected to delete.");
+    }
+  }
+
   const handleDeleteSelectedNode = async () => {
-    if (selectedNodeId) {
+    if (nowSelectedNode) {
       try {
         const response = await fetch(`http://localhost:4096/node?id=${nowSelectedNode}`, {
           method: "DELETE",
@@ -244,7 +283,9 @@ function App() {
                 <button onClick={handleFetchAndSaveGraph}>Fetch & Save Graph</button>
                 <button onClick={() => setNowSelectedNode(null)}>Clear Selection</button>
                 <button onClick={handlePrintSelectedNodeId}>PUT Node</button>
+                <button onClick={handlePutNodeTree}>Put Node Tree</button>
                 <button onClick={handleDeleteSelectedNode}>Delete Node</button>
+                <button onClick={handleCleanNodeFather}>Clean Father</button>
                 Selected Node: {nowSelectedNode}
                 <input
                   type="text"
