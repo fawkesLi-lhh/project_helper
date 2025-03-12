@@ -172,7 +172,7 @@ fn init_graph_inner() -> Result<()> {
         println!("graph already initialized");
         return Ok(());
     }
-    let cg = parse_from_dot("data/kaspa.dot")?;
+    let cg = parse_from_dot("data/master.dot")?;
     let mut node_id_to_name = HashMap::new();
     let mut father_name = Vec::new();
     gen_node_id_to_name(&cg.nodes, &mut node_id_to_name, &mut father_name);
