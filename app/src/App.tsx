@@ -31,6 +31,7 @@ function App() {
   const [relatedNodes, setRelatedNodes] = useState<NodeData[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);//列表目前选择的
+  const [isHighlightMode, setIsHighlightMode] = useState(false);
   useEffect(() => {
     const fetchRelatedNodes = async () => {
       try {
@@ -243,6 +244,27 @@ function App() {
     }
   };
 
+  const handleHighlightMode = () => {
+    if (!isHighlightMode) {
+      // 开启高亮模式
+      const highlightedNodes = reactflowNodes.map(node => ({
+        ...node,
+        style: node.data.label.toLowerCase().includes(searchQuery.toLowerCase())
+          ? { background: '#FFD700', border: '2px solid #FFA500' }
+          : undefined
+      }));
+      setReactflowNodes(highlightedNodes);
+    } else {
+      // 关闭高亮模式
+      const normalNodes = reactflowNodes.map(node => ({
+        ...node,
+        style: undefined
+      }));
+      setReactflowNodes(normalNodes);
+    }
+    setIsHighlightMode(!isHighlightMode);
+  };
+
   return (
     <>
       {/* General Editor Layout */}
@@ -283,9 +305,12 @@ function App() {
                 <button onClick={handleFetchAndSaveGraph}>Fetch & Save Graph</button>
                 <button onClick={() => setNowSelectedNode(null)}>Clear Selection</button>
                 <button onClick={handlePrintSelectedNodeId}>PUT Node</button>
-                <button onClick={handlePutNodeTree}>Put Node Tree</button>
                 <button onClick={handleDeleteSelectedNode}>Delete Node</button>
-                <button onClick={handleCleanNodeFather}>Clean Father</button>
+                <button onClick={handleCleanNodeFather}>Find Parent</button>
+                <button onClick={handlePutNodeTree}>Find Children</button>
+                <button onClick={handleHighlightMode}>
+                  {isHighlightMode ? 'Disable Highlight' : 'Enable Highlight'}
+                </button>
                 Selected Node: {nowSelectedNode}
                 <input
                   type="text"
