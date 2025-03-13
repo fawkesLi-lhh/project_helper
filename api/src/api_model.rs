@@ -20,6 +20,7 @@ pub struct AppState {
     pub graph: Graph,
     pub node_id_to_name: HashMap<String, String>,
     pub edge_from_to: HashMap<String, HashSet<String>>,
+    pub edge_to_from: HashMap<String, HashSet<String>>,
     pub node_id_to_new_name: HashMap<String, String>,
     pub node_set: HashSet<String>,
 }

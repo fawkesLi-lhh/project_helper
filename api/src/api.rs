@@ -58,10 +58,7 @@ fn gen_graph_inner() -> Result<String> {
     }
     let mut nodes = Vec::new();
     for id in state.node_set {
-        let mut name = state
-            .node_id_to_name
-            .remove(&id)
-            .ok_or(anyhow::anyhow!("node name not found"))?;
+        let mut name = state.node_id_to_name.remove(&id).unwrap_or(id.clone());
         if let Some(new_name) = state.node_id_to_new_name.remove(&id) {
             name = new_name;
         }
@@ -166,13 +163,7 @@ fn filter_node_father_tree_inner(query: Node) -> Result<()> {
     let state = pre_state
         .as_mut()
         .ok_or(anyhow::anyhow!("state not found"))?;
-    let mut edge_to_from = HashMap::new();
-    for i in state.edge_from_to.iter() {
-        for j in i.1.iter() {
-            let entry = edge_to_from.entry(j.clone()).or_insert_with(HashSet::new);
-            entry.insert(i.0.clone());
-        }
-    }
+    let is_init = state.node_set.len() <= 1;
     let mut new_node_set = HashSet::new();
     let mut now_deque = VecDeque::new();
     now_deque.push_back(query.id.clone());
@@ -181,9 +172,9 @@ fn filter_node_father_tree_inner(query: Node) -> Result<()> {
             continue;
         }
         new_node_set.insert(now_id.clone());
-        if let Some(fathers) = edge_to_from.get(&now_id) {
+        if let Some(fathers) = state.edge_to_from.get(&now_id) {
             for father in fathers {
-                if state.node_set.contains(father) {
+                if state.node_set.contains(father) || is_init {
                     now_deque.push_back(father.clone());
                 }
             }
@@ -201,20 +192,25 @@ fn put_node_tree_inner(query: Node) -> Result<()> {
     let state = pre_state
         .as_mut()
         .ok_or(anyhow::anyhow!("state not found"))?;
+    let is_init = state.node_set.len() <= 1;
     let mut now_deque = VecDeque::new();
+    let mut new_node_set = HashSet::new();
     state.node_set.remove(&query.id);
     now_deque.push_back(query.id);
     while let Some(now_id) = now_deque.pop_front() {
         if state.node_set.contains(&now_id) {
             continue;
         }
-        state.node_set.insert(now_id.clone());
+        new_node_set.insert(now_id.clone());
         if let Some(tos) = state.edge_from_to.get(&now_id) {
             for to in tos {
-                now_deque.push_back(to.clone());
+                if is_init || state.node_set.contains(to) {
+                    now_deque.push_back(to.clone());
+                }
             }
         }
     }
+    state.node_set = new_node_set;
     Ok(())
 }
 
@@ -283,10 +279,18 @@ fn init_graph_inner() -> Result<()> {
             .or_insert_with(HashSet::new);
         entry.insert(edge.to.clone());
     }
+    let mut edge_to_from = HashMap::new();
+    for i in edge_from_to.iter() {
+        for j in i.1.iter() {
+            let entry = edge_to_from.entry(j.clone()).or_insert_with(HashSet::new);
+            entry.insert(i.0.clone());
+        }
+    }
     let state = AppState {
         graph: cg,
         node_id_to_name,
         edge_from_to,
+        edge_to_from,
         node_id_to_new_name: HashMap::new(),
         node_set: HashSet::new(),
     };
